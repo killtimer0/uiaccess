@@ -1,0 +1,8 @@
+
+#define IDD_MAIN				100
+#define IDC_MAIN_UIACCESS		101
+#define IDC_MAIN_TOP			102
+#define IDC_MAIN_OPEN_TASKMGR	103
+#define IDC_MAIN_LBL_CMD		104
+#define IDC_MAIN_CMD			105
+

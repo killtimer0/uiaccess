@@ -338,3 +338,5 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+/uiaccess/build_amd64.bat
+/uiaccess/build_x86.bat
