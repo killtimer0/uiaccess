@@ -3,47 +3,62 @@
 #include <tchar.h>
 
 static DWORD DuplicateWinloginToken(DWORD dwSessionId, DWORD dwDesiredAccess, PHANDLE phToken) {
-	HANDLE hSnapshot;
 	DWORD dwErr;
+	PRIVILEGE_SET ps;
 
-	hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (INVALID_HANDLE_VALUE != hSnapshot) {
-		BOOL bCont, bFound = FALSE;
-		PROCESSENTRY32 pe;
+	ps.PrivilegeCount = 1;
+	ps.Control = PRIVILEGE_SET_ALL_NECESSARY;
 
-		pe.dwSize = sizeof (pe);
-		dwErr = ERROR_NOT_FOUND;
+	if (LookupPrivilegeValue(NULL, SE_TCB_NAME, &ps.Privilege[0].Luid)) {
+		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+		if (INVALID_HANDLE_VALUE != hSnapshot) {
+			BOOL bCont, bFound = FALSE;
+			PROCESSENTRY32 pe;
 
-		for (bCont = Process32First(hSnapshot, &pe); bCont; bCont = Process32Next(hSnapshot, &pe)) {
-			if (0 == _tcsicmp(pe.szExeFile, TEXT("winlogon.exe"))) {
-				HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
+			pe.dwSize = sizeof (pe);
+			dwErr = ERROR_NOT_FOUND;
 
+			for (bCont = Process32First(hSnapshot, &pe); bCont; bCont = Process32Next(hSnapshot, &pe)) {
+				HANDLE hProcess;
+
+				if (0 != _tcsicmp(pe.szExeFile, TEXT("winlogon.exe"))) {
+					continue;
+				}
+
+				hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
 				if (hProcess) {
 					HANDLE hToken;
 					DWORD dwRetLen, sid;
 
 					if (OpenProcessToken(hProcess, TOKEN_QUERY | TOKEN_DUPLICATE, &hToken)) {
-						if (GetTokenInformation(hToken, TokenSessionId, &sid, sizeof (sid), &dwRetLen) && sid == dwSessionId) {
-							bFound = TRUE;
-							if (DuplicateTokenEx(hToken, dwDesiredAccess, NULL, SecurityImpersonation, TokenImpersonation, phToken)) {
-								dwErr = ERROR_SUCCESS;
-							} else {
-								dwErr = GetLastError();
+						BOOL fTcb;
+
+						if (PrivilegeCheck(hToken, &ps, &fTcb) && fTcb) {
+							if (GetTokenInformation(hToken, TokenSessionId, &sid, sizeof (sid), &dwRetLen) && sid == dwSessionId) {
+								bFound = TRUE;
+								if (DuplicateTokenEx(hToken, dwDesiredAccess, NULL, SecurityImpersonation, TokenImpersonation, phToken)) {
+									dwErr = ERROR_SUCCESS;
+								} else {
+									dwErr = GetLastError();
+								}
 							}
 						}
 						CloseHandle(hToken);
 					}
 					CloseHandle(hProcess);
 				}
+
+				if (bFound) break;
 			}
 
-			if (bFound) break;
+			CloseHandle(hSnapshot);
+		} else {
+			dwErr = GetLastError();
 		}
-
-		CloseHandle(hSnapshot);
 	} else {
 		dwErr = GetLastError();
 	}
+
 
 	return dwErr;
 }
@@ -130,6 +145,8 @@ DWORD PrepareForUIAccess() {
 				} else {
 					dwErr = GetLastError();
 				}
+
+				CloseHandle(hTokenUIAccess);
 			}
 		}
 	}
