@@ -63,6 +63,8 @@ static int InitInstance(HINSTANCE hInstance)
 
 	dbgstart();
 
+	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
 	dwErr = PrepareForUIAccess();
 	if (ERROR_SUCCESS != dwErr)
 		dbg("UIAccess error: 0x%08X\n", dwErr);
@@ -72,6 +74,8 @@ static int InitInstance(HINSTANCE hInstance)
 
 	iResult = DialogBox(g_hInstance, MAKEINTRESOURCE(IDD_MAIN), NULL, DialogProc);
 	g_hdlg = NULL;
+
+	CoUninitialize();
 
 	dbgend();
 
